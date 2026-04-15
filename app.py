@@ -161,8 +161,9 @@ def calculate():
     try:
         legs = response['routes'][0]['legs']
         total_m = sum(leg['distance']['value'] for leg in legs)
-    except:
-        return jsonify({"error": "No se pudo calcular la ruta"})
+    
+    except Exception as e:
+    return jsonify({"error": str(e)})
 
     km = total_m / 1000
     cost = (km * 0.40) + 20
