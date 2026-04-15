@@ -22,10 +22,10 @@ API_KEY = os.getenv("GOOGLE_MAPS_API_KEY")
 # =========================
 
 # Coordenadas o dirección de tu casa
-CASA = "(37.371069, -5.977354)"
+CASA = "37.371069, -5.977354"
 
 # Punto fijo de la Feria (entrada recomendada)
-FERIA = "(37.367850, -5.995283)"
+FERIA = "37.367850, -5.995283"
 
 # Waypoints para evitar calles cortadas (EDITAR AQUÍ)
 FERIA_WAYPOINTS = "Av. de la Palmera, Sevilla|Puente de las Delicias, Sevilla|Calle Torneo, Sevilla"
