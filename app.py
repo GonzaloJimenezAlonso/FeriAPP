@@ -4,15 +4,17 @@ import os
 
 app = Flask(__name__)
 
-# Asegúrate de configurar tu API KEY
 API_KEY = os.getenv("GOOGLE_MAPS_API_KEY", "TU_API_KEY_AQUI")
 
 # =========================
 # 🔧 CONFIGURACIÓN
 # =========================
 CASA = "37.371069,-5.977354"
-FERIA = "37.367850,-5.995283"
-FERIA_WAYPOINTS = "Av. de la Palmera, Sevilla|Puente de las Delicias, Sevilla"
+# Dos puntos de feria
+FERIA_1 = "37.367850,-5.995283" # Portada
+FERIA_2 = "37.371642,-5.996819" # Nueva ubicación
+# Puntos para forzar el rodeo de Juan Pablo II (vía alternativa)
+EVITAR_JUAN_PABLO_II = "37.3635,-5.9915|37.3588,-5.9928" 
 
 HTML = f"""
 <!DOCTYPE html>
@@ -23,57 +25,64 @@ HTML = f"""
     <title>Calculador de Costes Pro</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body {{ background-color: #f3f4f6; color: #1f2937; }}
-        .card {{ background: white; border-radius: 16px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }}
-        .price-badge {{ background: #ecfdf5; color: #059669; border: 2px solid #10b981; }}
-        #map {{ height: 200px; border-radius: 12px; filter: grayscale(0.5); opacity: 0.7; }}
+        body {{ background-color: #f8fafc; color: #1e293b; font-family: system-ui, -apple-system, sans-serif; }}
+        .card {{ background: white; border-radius: 24px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1); border: 1px solid #e2e8f0; }}
+        .price-card {{ background: linear-gradient(135deg, #059669 0%, #10b981 100%); color: white; }}
+        #map {{ height: 180px; border-radius: 16px; margin-top: 15px; border: 1px solid #cbd5e1; }}
+        select, input {{ transition: all 0.2s; }}
+        select:focus, input:focus {{ border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2); }}
     </style>
 </head>
-<body class="p-4 max-w-md mx-auto">
+<body class="p-4 max-w-lg mx-auto">
 
-    <div class="card p-6 space-y-4">
-        <h1 class="text-2xl font-bold text-center text-blue-600 mb-4">🚗 Route Cost Pro</h1>
+    <div class="card p-6 space-y-5">
+        <header class="text-center">
+            <h1 class="text-2xl font-black text-slate-800 tracking-tight">ROUTE COST <span class="text-blue-600">PRO</span></h1>
+            <p class="text-slate-500 text-sm">Calculador logístico optimizado</p>
+        </header>
         
-        <div class="space-y-2">
-            <label class="text-sm font-semibold text-gray-600 uppercase">Modo de servicio</label>
-            <select id="mode" class="w-full p-3 border rounded-lg bg-gray-50 focus:ring-2 focus:ring-blue-500 outline-none">
-                <option value="delivery">Llevar (Casa -> Cliente -> Feria -> Casa)</option>
-                <option value="pickup">Recoger (Casa -> Feria -> Cliente -> Casa)</option>
-            </select>
+        <div class="grid grid-cols-2 gap-3">
+            <div class="col-span-2 space-y-1">
+                <label class="text-xs font-bold text-slate-400 uppercase ml-1">Servicio</label>
+                <select id="mode" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm">
+                    <option value="delivery text-xs">🚚 LLEVAR (Casa -> Cliente)</option>
+                    <option value="pickup text-xs">📦 RECOGER (Feria -> Cliente)</option>
+                </select>
+            </div>
+
+            <div class="col-span-2 space-y-1">
+                <label class="text-xs font-bold text-slate-400 uppercase ml-1">Punto de Feria</label>
+                <select id="feria_point" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm">
+                    <option value="1">📍 Portada (Principal)</option>
+                    <option value="2">📍 Punto Alternativo (37.371, -5.996)</option>
+                </select>
+            </div>
         </div>
 
-        <div class="space-y-2">
-            <label class="text-sm font-semibold text-gray-600 uppercase">Dirección del Cliente</label>
-            <input id="address" type="text" placeholder="Calle, ciudad..." class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
-            <button onclick="useLocation()" class="text-xs text-blue-600 font-medium flex items-center hover:underline">
-                📍 Usar mi ubicación actual
-            </button>
+        <div class="space-y-1">
+            <label class="text-xs font-bold text-slate-400 uppercase ml-1">Destino Cliente</label>
+            <input id="address" type="text" placeholder="Ej: Calle Sierpes, Sevilla" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm">
+            <button onclick="useLocation()" class="text-xs text-blue-600 font-semibold px-1 pt-1">📍 Usar mi ubicación</button>
         </div>
 
-        <div class="flex items-center space-x-2 p-2 bg-amber-50 rounded-lg">
-            <input type="checkbox" id="feria" class="w-5 h-5 accent-amber-500">
-            <label for="feria" class="text-sm text-amber-800 font-medium">Evitar puntos conflictivos Feria</label>
+        <div class="flex items-center space-x-3 p-3 bg-red-50 rounded-xl border border-red-100">
+            <input type="checkbox" id="evitar" checked class="w-5 h-5 accent-red-600">
+            <label for="evitar" class="text-xs text-red-700 font-bold uppercase">Evitar Av. Juan Pablo II / Cortes</label>
         </div>
 
-        <button onclick="calcular()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-xl transition duration-200 shadow-lg">
-            CALCULAR RUTA
+        <button onclick="calcular()" class="w-full bg-slate-900 hover:bg-black text-white font-bold py-4 rounded-2xl transition shadow-xl active:scale-[0.98]">
+            CALCULAR AHORA
         </button>
 
-        <div id="loader" class="hidden text-center text-gray-500 animate-pulse">Calculando mejor ruta...</div>
-
-        <div id="result-container" class="hidden space-y-4 pt-4 border-t">
-            <div class="price-badge rounded-2xl p-6 text-center">
-                <p class="text-sm uppercase font-bold tracking-widest opacity-80">Precio Final</p>
-                <h2 id="cost-display" class="text-5xl font-black mt-1">0.00€</h2>
-            </div>
-            
-            <div class="flex justify-between text-sm px-2 text-gray-500 italic">
-                <span id="km-display">0 km totales</span>
-                <span>Tarifa: 0.40€/km + 20€ base</span>
+        <div id="result-container" class="hidden animate-in fade-in zoom-in duration-300">
+            <div class="price-card rounded-2xl p-5 text-center shadow-lg shadow-emerald-200">
+                <span class="text-xs font-bold uppercase opacity-80 tracking-widest">Presupuesto Estimado</span>
+                <div id="cost-display" class="text-5xl font-black my-1">0.00€</div>
+                <div id="km-display" class="text-xs opacity-90 font-medium">0 km totales</div>
             </div>
         </div>
 
-        <div id="map" class="mt-4"></div>
+        <div id="map"></div>
     </div>
 
     <script src="https://maps.googleapis.com/maps/api/js?key={API_KEY}&libraries=places"></script>
@@ -82,16 +91,46 @@ HTML = f"""
 
         function initMap() {{
             map = new google.maps.Map(document.getElementById("map"), {{
-                center: {{ lat: 37.3891, lng: -5.9845 }},
-                zoom: 12,
-                disableDefaultUI: true
+                center: {{ lat: 37.37, lng: -5.98 }}, zoom: 13,
+                disableDefaultUI: true,
+                styles: [{{ "featureType": "poi", "elementType": "labels", "stylers": [{{ "visibility": "off" }}] }}]
             }});
             directionsService = new google.maps.DirectionsService();
-            directionsRenderer = new google.maps.DirectionsRenderer({{
-                map: map,
-                suppressMarkers: false
-            }});
+            directionsRenderer = new google.maps.DirectionsRenderer({{ map: map }});
             new google.maps.places.Autocomplete(document.getElementById("address"));
+        }}
+
+        async function calcular() {{
+            const address = document.getElementById("address").value;
+            if(!address) return;
+
+            const res = await fetch('/calculate', {{
+                method: 'POST',
+                headers: {{'Content-Type': 'application/json'}},
+                body: JSON.stringify({{ 
+                    address, 
+                    mode: document.getElementById("mode").value,
+                    feria_point: document.getElementById("feria_point").value,
+                    evitar: document.getElementById("evitar").checked 
+                }})
+            }});
+
+            const data = await res.json();
+            if (data.error) return alert(data.error);
+
+            document.getElementById("cost-display").innerText = data.cost.toFixed(2) + "€";
+            document.getElementById("km-display").innerText = data.km + " KM de recorrido total";
+            document.getElementById("result-container").classList.remove("hidden");
+
+            // Dibujar en mapa
+            directionsService.route({{
+                origin: data.origin,
+                destination: data.destination,
+                waypoints: data.waypoints_list,
+                travelMode: 'DRIVING'
+            }}, (result, status) => {{
+                if (status === 'OK') directionsRenderer.setDirections(result);
+            }});
         }}
 
         function useLocation() {{
@@ -99,55 +138,6 @@ HTML = f"""
                 navigator.geolocation.getCurrentPosition(pos => {{
                     document.getElementById("address").value = pos.coords.latitude + "," + pos.coords.longitude;
                 }});
-            }}
-        }}
-
-        async function calcular() {{
-            const address = document.getElementById("address").value;
-            const mode = document.getElementById("mode").value;
-            const feria = document.getElementById("feria").checked;
-            const loader = document.getElementById("loader");
-            const resultContainer = document.getElementById("result-container");
-
-            if(!address) return alert("Escribe una dirección");
-
-            loader.classList.remove("hidden");
-            resultContainer.classList.add("hidden");
-
-            try {{
-                const res = await fetch('/calculate', {{
-                    method: 'POST',
-                    headers: {{'Content-Type': 'application/json'}},
-                    body: JSON.stringify({{ address, mode, feria }})
-                }});
-
-                const data = await res.json();
-
-                if (data.error) {{
-                    alert("Error: " + data.error);
-                }} else {{
-                    document.getElementById("cost-display").innerText = data.cost + "€";
-                    document.getElementById("km-display").innerText = data.km + " km totales (ida y vuelta)";
-                    resultContainer.classList.remove("hidden");
-                    
-                    // Dibujar ruta en el mapa
-                    const request = {{
-                        origin: data.origin,
-                        destination: data.destination,
-                        waypoints: data.waypoints_list,
-                        travelMode: 'DRIVING'
-                    }};
-                    
-                    directionsService.route(request, (result, status) => {{
-                        if (status === 'OK') {{
-                            directionsRenderer.setDirections(result);
-                        }}
-                    }});
-                }}
-            }} catch (e) {{
-                alert("Error de conexión");
-            }} finally {{
-                loader.classList.add("hidden");
             }}
         }}
 
@@ -166,56 +156,56 @@ def calculate():
     data = request.json
     address = data['address']
     mode = data['mode']
-    feria = data['feria']
+    evitar = data['evitar']
+    f_point = data['feria_point']
 
-    # Lógica de paradas según modo
-    # Modo Delivery: Casa -> Cliente -> Feria -> Casa
-    # Modo Pickup: Casa -> Feria -> Cliente -> Casa
+    punto_feria_elegido = FERIA_1 if f_point == "1" else FERIA_2
+
+    # Construcción de la ruta lógica
+    # Usamos el prefijo 'via:' para que Google pase por ahí pero no lo cuente como parada de carga/descarga
+    waypoints_raw = []
+
+    if evitar:
+        # Añadimos puntos de control para obligar a rodear Juan Pablo II
+        for wp in EVITAR_JUAN_PABLO_II.split('|'):
+            waypoints_raw.append(f"via:{wp}")
+
     if mode == "delivery":
-        way_list = [address, FERIA]
+        # Casa -> Cliente -> Feria -> Casa
+        waypoints_raw.insert(0, address)
+        waypoints_raw.append(punto_feria_elegido)
     else:
-        way_list = [FERIA, address]
-
-    if feria:
-        for wp in FERIA_WAYPOINTS.split('|'):
-            way_list.append(wp)
-
-    # Convertir lista de waypoints para la URL de Google
-    waypoints_str = "|".join(way_list)
+        # Casa -> Feria -> Cliente -> Casa
+        waypoints_raw.insert(0, punto_feria_elegido)
+        waypoints_raw.append(address)
 
     params = {
         "origin": CASA,
         "destination": CASA,
-        "waypoints": waypoints_str,
+        "waypoints": "|".join(waypoints_raw),
         "key": API_KEY
     }
 
-    url = "https://maps.googleapis.com/maps/api/directions/json"
-    response = requests.get(url, params=params).json()
+    response = requests.get("https://maps.googleapis.com/maps/api/directions/json", params=params).json()
 
     if response.get('status') != 'OK':
-        return jsonify({"error": response.get('error_message', 'No se pudo encontrar la ruta')})
+        return jsonify({"error": "No se pudo calcular la ruta. Revisa la dirección."})
 
-    try:
-        legs = response['routes'][0]['legs']
-        total_m = sum(leg['distance']['value'] for leg in legs)
-        
-        km = total_m / 1000
-        # Tu fórmula: 20€ base + 0.40€ por km
-        cost = (km * 0.40) + 20
+    route = response['routes'][0]
+    total_m = sum(leg['distance']['value'] for leg in route['legs'])
+    km = total_m / 1000
+    cost = (km * 0.40) + 20
 
-        # Formatear waypoints para que el JS los entienda fácilmente
-        js_waypoints = [{"location": loc, "stopover": True} for loc in way_list]
+    # Preparar waypoints para el mapa JS
+    js_waypoints = [{"location": loc.replace("via:", ""), "stopover": not loc.startswith("via:")} for loc in waypoints_raw]
 
-        return jsonify({
-            "km": round(km, 2),
-            "cost": round(cost, 2),
-            "origin": CASA,
-            "destination": CASA,
-            "waypoints_list": js_waypoints
-        })
-    except Exception as e:
-        return jsonify({"error": str(e)})
+    return jsonify({
+        "km": round(km, 2),
+        "cost": round(cost, 2),
+        "origin": CASA,
+        "destination": CASA,
+        "waypoints_list": js_waypoints
+    })
 
 if __name__ == '__main__':
     app.run(debug=True)
