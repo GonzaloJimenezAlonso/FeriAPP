@@ -30,12 +30,11 @@ HTML = f"""
 
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body { background-color: #f1f5f9; }
-        .main-card { background: white; border-radius: 20px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); }
-        .price-box { background: linear-gradient(135deg, #1e293b 0%, #334155 100%); }
-        #map { height: 200px; border-radius: 15px; margin-top: 15px; filter: contrast(0.8) brightness(1.1); }
-        /* Animación para que la flamenca sea el logo arriba */
-        .emoji-header { font-size: 3.5rem; line-height: 1; margin-bottom: 0.5rem; display: block; }
+        body {{ background-color: #f1f5f9; }}
+        .main-card {{ background: white; border-radius: 20px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); }}
+        .price-box {{ background: linear-gradient(135deg, #1e293b 0%, #334155 100%); }}
+        #map {{ height: 200px; border-radius: 15px; margin-top: 15px; filter: contrast(0.8) brightness(1.1); }}
+        .emoji-header {{ font-size: 3.5rem; line-height: 1; margin-bottom: 0.5rem; display: block; }}
     </style>
 </head>
 <body class="p-4 max-w-md mx-auto">
